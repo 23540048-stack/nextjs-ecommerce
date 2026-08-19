@@ -1,11 +1,11 @@
-"use client";
-
 import React from "react";
 import Header from "@/components/layout/Header";
 import Hero from "@/components/home/hero";
 import CollectionSection from "@/components/home/CollectionCard";
 import FeaturedSection from "@/components/home/FeaturedProducts";
 import Footer from "@/components/layout/Footer";
+
+export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   return (
