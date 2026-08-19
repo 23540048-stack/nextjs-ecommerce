@@ -9,6 +9,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        // Thay chuỗi bên dưới bằng URL Backend Render thực tế của bạn
+        destination: "https://TEN-BACKEND-CUA-BAN.onrender.com/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
