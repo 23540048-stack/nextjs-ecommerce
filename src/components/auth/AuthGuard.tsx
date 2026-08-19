@@ -13,27 +13,22 @@ interface AuthGuardProps {
 export default function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const clientToken = useAuthStore((state) => state.token);
+
+  // Lấy user từ Zustand Store (đã được populate từ API me/profile)
+  const user = useAuthStore((state) => state.user);
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    // Kiểm tra token từ Zustand hoặc LocalStorage
-    const token =
-      clientToken ||
-      (typeof window !== "undefined"
-        ? localStorage.getItem("client_access_token")
-        : null);
-
-    if (!token) {
+    // Với HttpOnly Cookie: Chỉ cần kiểm tra xem store có thông tin `user` hay chưa
+    if (!user) {
       toast.error("PLEASE LOG IN TO ACCESS THIS PAGE!");
-      // Điều hướng về login và lưu lại trang hiện tại để quay lại sau khi đăng nhập thành công
       router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
     } else {
       setIsAuthorized(true);
     }
-  }, [clientToken, router, pathname]);
+  }, [user, router, pathname]);
 
-  // Hiển thị màn hình chờ trong lúc kiểm tra token để tránh lộ giao diện riêng tư
+  // Màn hình chờ kiểm tra quyền truy cập
   if (!isAuthorized) {
     return (
       <div className="w-full min-h-[60vh] flex flex-col items-center justify-center font-mono gap-3">
