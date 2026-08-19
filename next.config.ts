@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
       {
         source: "/api/:path*",
         // Thay chuỗi bên dưới bằng URL Backend Render thực tế của bạn
-        destination: "https://TEN-BACKEND-CUA-BAN.onrender.com/:path*",
+        destination: "https://shinobi-aa3i.onrender.com/:path*",
       },
     ];
   },
