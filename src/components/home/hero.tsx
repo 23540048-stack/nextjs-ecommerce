@@ -12,16 +12,40 @@ export interface MediaItem {
   caption?: string;
 }
 
-// 2. Interface Banner hỗ trợ cả cấu trúc mảng items MỚI và field đơn CŨ
+// 2. Các vị trí có thể hiển thị banner
+export type BannerLocation =
+  | "HOME_HERO"
+  | "PROMO_BAR"
+  | "CATEGORY_SIDEBAR"
+  | "POPUP";
+
+// 3. Interface Banner
 export interface Banner {
   _id: string;
   title: string;
-  location?: string;
-  items?: MediaItem[]; // 🚀 Cấu trúc mới hỗ trợ upload nhiều ảnh/video
-  mediaType?: "image" | "video"; // Fallback dữ liệu cũ
-  mediaUrl?: string; // Fallback dữ liệu cũ
-  linkUrl: string;
-  status?: string;
+  subtitle?: string;
+  description?: string;
+
+  location?: BannerLocation;
+
+  items?: MediaItem[];
+
+  mediaType?: "image" | "video";
+  mediaUrl?: string;
+  imageUrl?: string;
+  image?: string;
+
+  badge?: string;
+  badgeText?: string;
+
+  linkUrl?: string;
+
+  status?: "active" | "inactive" | "scheduled";
+
+  startDate?: string;
+  endDate?: string;
+
+  clicks?: number;
 }
 
 interface HeroProps {
@@ -36,46 +60,55 @@ export default function Hero({
   onBannerClick,
 }: HeroProps) {
   const [banners, setBanners] = useState<Banner[]>(initialBanners || []);
+
   const [loading, setLoading] = useState<boolean>(
     initialLoading !== undefined ? initialLoading : !initialBanners,
   );
 
-  // Quản lý Index của Banner hiện tại và Media Item hiện tại (Slide con)
+  // Quản lý Index của Banner hiện tại và Media Item hiện tại
   const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
   const [currentMediaIdx, setCurrentMediaIdx] = useState(0);
 
   // Fetch Banners từ Backend
   useEffect(() => {
+    // Nếu parent truyền banners vào thì vẫn lọc chính xác HOME_HERO
     if (initialBanners && initialBanners.length > 0) {
       const filtered = initialBanners.filter(
         (b) =>
-          (!b.location || b.location === "HOME_HERO") &&
-          (b.status === "active" || !b.status),
+          b.location === "HOME_HERO" && (b.status === "active" || !b.status),
       );
+
       setBanners(filtered);
+      setCurrentBannerIdx(0);
       setLoading(false);
+
       return;
     }
 
     const fetchHeroBanners = async () => {
       try {
         setLoading(true);
+
+        // Chỉ lấy banner dành cho HOME HERO
         const res = await api.get("/banners?location=HOME_HERO");
+
         const list: Banner[] = Array.isArray(res.data)
           ? res.data
           : Array.isArray(res.data?.data)
             ? res.data.data
             : [];
 
-        const activeHeroBanners = list.filter((b) => {
-          const isHomeHero = !b.location || b.location === "HOME_HERO";
-          const isActive = b.status === "active" || !b.status;
-          return isHomeHero && isActive;
-        });
+        // Lọc thêm lần nữa ở frontend để đảm bảo chính xác
+        const activeHeroBanners = list.filter(
+          (b) =>
+            b.location === "HOME_HERO" && (b.status === "active" || !b.status),
+        );
 
         setBanners(activeHeroBanners);
+        setCurrentBannerIdx(0);
       } catch (err) {
         console.error("Lỗi khi tải Hero Banners:", err);
+        setBanners([]);
       } finally {
         setLoading(false);
       }
@@ -87,7 +120,7 @@ export default function Hero({
   // Lấy ra Banner hiện tại
   const currentBanner = banners[currentBannerIdx];
 
-  // Chuẩn hóa danh sách Media (Convert dữ liệu cũ sang định dạng mảng thống nhất)
+  // Chuẩn hóa danh sách Media
   const mediaList: MediaItem[] = useMemo(() => {
     if (!currentBanner) return [];
 
@@ -96,12 +129,32 @@ export default function Hero({
       return currentBanner.items;
     }
 
-    // Nếu dùng cấu trúc CŨ (1 url duy nhất)
+    // Nếu dùng cấu trúc CŨ (1 URL duy nhất)
     if (currentBanner.mediaUrl) {
       return [
         {
           type: currentBanner.mediaType || "image",
           url: currentBanner.mediaUrl,
+        },
+      ];
+    }
+
+    // Fallback imageUrl cũ
+    if (currentBanner.imageUrl) {
+      return [
+        {
+          type: currentBanner.mediaType || "image",
+          url: currentBanner.imageUrl,
+        },
+      ];
+    }
+
+    // Fallback image cũ
+    if (currentBanner.image) {
+      return [
+        {
+          type: currentBanner.mediaType || "image",
+          url: currentBanner.image,
         },
       ];
     }
@@ -120,7 +173,7 @@ export default function Hero({
     return () => clearInterval(timer);
   }, [mediaList]);
 
-  // Reset về hình đầu tiên khi chuyển sang Banner/Campaign khác
+  // Reset về hình đầu tiên khi chuyển Banner/Campaign
   useEffect(() => {
     setCurrentMediaIdx(0);
   }, [currentBannerIdx]);
@@ -137,59 +190,41 @@ export default function Hero({
   };
 
   const handleCTAButtonClick = () => {
-    if (onBannerClick && currentBanner) {
-      onBannerClick(currentBanner._id, currentBanner.linkUrl);
-    } else if (currentBanner?.linkUrl) {
+    if (!currentBanner) return;
+
+    if (onBannerClick) {
+      onBannerClick(currentBanner._id, currentBanner.linkUrl || "/shop");
+      return;
+    }
+
+    if (currentBanner.linkUrl) {
       window.location.href = currentBanner.linkUrl;
     }
   };
 
-  // 1. MÀN HÌNH LOADING HOẶC KHÔNG CÓ BANNER
-  if (loading || !banners || banners.length === 0 || mediaList.length === 0) {
+  // 1. MÀN HÌNH LOADING
+  if (loading) {
     return (
       <section className="relative min-h-[85vh] flex items-center justify-center bg-brand-dark text-brand-ivory overflow-hidden px-6">
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-25 mix-blend-luminosity"
-          style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=1600')`,
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-brand-dark via-brand-dark/60 to-brand-dark" />
+        <div className="relative z-10 flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
 
-        <div className="relative z-10 max-w-4xl text-center space-y-6 pt-12">
-          {loading ? (
-            <div className="flex justify-center py-6">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-            </div>
-          ) : (
-            <>
-              <h1 className="text-6xl sm:text-8xl md:text-9xl font-heading tracking-wider uppercase leading-none">
-                THE WILL OF FIRE
-              </h1>
-              <p className="max-w-md mx-auto text-sm sm:text-base text-brand-ivory/80 font-sans tracking-wide">
-                Carry the spirit of the Hidden Leaf.
-              </p>
-              <div className="pt-4">
-                <Link
-                  href="/shop"
-                  className="group relative inline-flex items-center gap-3 overflow-hidden border-2 border-orange-500 bg-orange-500 px-8 py-4 font-heading text-xl tracking-[0.2em] text-white uppercase transition-all duration-300 hover:bg-brand-dark hover:text-orange-500 hover:shadow-[0_0_25px_rgba(234,88,12,0.6)] shrink-0"
-                >
-                  <span className="relative z-10 font-bold">
-                    SUMMON YOUR GEAR
-                  </span>
-                  <ArrowRight size={22} className="relative z-10" />
-                </Link>
-              </div>
-            </>
-          )}
+          <span className="text-xs font-mono tracking-widest text-brand-ivory/60 uppercase">
+            LOADING HERO...
+          </span>
         </div>
       </section>
     );
   }
 
+  // 2. KHÔNG CÓ BANNER
+  if (!banners || banners.length === 0 || mediaList.length === 0) {
+    return null;
+  }
+
   const currentMedia = mediaList[currentMediaIdx];
 
-  // 2. MÀN HÌNH HIỂN THỊ BANNER VÀ MULTI-MEDIA SLIDER
+  // 3. HIỂN THỊ BANNER VÀ MULTI-MEDIA SLIDER
   return (
     <section className="relative min-h-[85vh] flex items-center justify-center bg-brand-dark text-brand-ivory overflow-hidden px-6">
       {/* 🖼️ BACKGROUND MEDIA (IMAGE / VIDEO) */}
@@ -208,7 +243,9 @@ export default function Hero({
           <div
             key={currentMedia.url}
             className="w-full h-full bg-cover bg-center opacity-35 mix-blend-luminosity transition-all duration-700 ease-out"
-            style={{ backgroundImage: `url('${currentMedia.url}')` }}
+            style={{
+              backgroundImage: `url('${currentMedia.url}')`,
+            }}
           />
         )}
       </div>
@@ -217,18 +254,29 @@ export default function Hero({
 
       {/* 📝 BANNER TEXT CONTENT */}
       <div className="relative z-10 max-w-4xl text-center space-y-6 pt-12">
+        {/* TITLE LẤY TRỰC TIẾP TỪ BANNER ADMIN */}
         <h1 className="text-5xl sm:text-7xl md:text-8xl font-heading tracking-wider uppercase leading-tight line-clamp-2">
           {currentBanner.title}
         </h1>
 
-        {/* Hiển thị caption phụ của từng ảnh/video nếu có */}
-        {currentMedia.caption ? (
+        {/* SUBTITLE LẤY TỪ BANNER ADMIN */}
+        {currentBanner.subtitle && (
+          <p className="max-w-md mx-auto text-sm sm:text-base text-brand-ivory/80 font-sans tracking-wide">
+            {currentBanner.subtitle}
+          </p>
+        )}
+
+        {/* DESCRIPTION LẤY TỪ BANNER ADMIN */}
+        {currentBanner.description && (
+          <p className="max-w-xl mx-auto text-xs sm:text-sm text-brand-ivory/70 font-sans tracking-wide line-clamp-2">
+            {currentBanner.description}
+          </p>
+        )}
+
+        {/* CAPTION CỦA MEDIA */}
+        {currentMedia.caption && (
           <p className="max-w-md mx-auto text-sm sm:text-base text-orange-400 font-sans tracking-wide">
             {currentMedia.caption}
-          </p>
-        ) : (
-          <p className="max-w-md mx-auto text-sm sm:text-base text-brand-ivory/80 font-sans tracking-wide">
-            Carry the spirit of the Hidden Leaf.
           </p>
         )}
 
@@ -238,6 +286,7 @@ export default function Hero({
             className="group relative inline-flex items-center gap-3 overflow-hidden border-2 border-orange-500 bg-orange-500 px-8 py-4 font-heading text-xl tracking-[0.2em] text-white uppercase transition-all duration-300 hover:bg-brand-dark hover:text-orange-500 hover:shadow-[0_0_25px_rgba(234,88,12,0.6)] shrink-0 cursor-pointer"
           >
             <span className="relative z-10 font-bold">SUMMON YOUR GEAR</span>
+
             <ArrowRight
               size={22}
               className="relative z-10 transition-transform duration-300 group-hover:translate-x-2"
@@ -252,7 +301,7 @@ export default function Hero({
         </div>
       </div>
 
-      {/* 🏹 NÚT ĐIỀU HƯỚNG & DOTS CHO MEDIA SLIDE (Ảnh/Video chạy qua lại) */}
+      {/* 🏹 NÚT ĐIỀU HƯỚNG & DOTS CHO MEDIA SLIDE */}
       {mediaList.length > 1 && (
         <>
           <button
@@ -261,6 +310,7 @@ export default function Hero({
           >
             <ChevronLeft size={24} />
           </button>
+
           <button
             onClick={handleNextMedia}
             className="absolute right-6 top-1/2 -translate-y-1/2 p-3 border border-brand-ivory/20 bg-brand-dark/80 text-brand-ivory hover:border-orange-500 hover:text-orange-500 transition-all z-20 cursor-pointer"
@@ -268,7 +318,7 @@ export default function Hero({
             <ChevronRight size={24} />
           </button>
 
-          {/* Thanh chấm tròn indicator cho Media */}
+          {/* Thanh indicator */}
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
             {mediaList.map((_, idx) => (
               <button
@@ -285,12 +335,12 @@ export default function Hero({
         </>
       )}
 
-      {/* 🔀 NẾU CÓ NHIỀU BANNER KHÁC NHAU: Hiển thị bộ chuyển Banner ở góc trên bên phải */}
+      {/* 🔀 CHUYỂN GIỮA CÁC BANNER */}
       {banners.length > 1 && (
         <div className="absolute top-6 right-6 z-20 flex gap-2">
-          {banners.map((_, idx) => (
+          {banners.map((banner, idx) => (
             <button
-              key={idx}
+              key={banner._id || idx}
               onClick={() => setCurrentBannerIdx(idx)}
               className={`px-3 py-1 text-xs font-bold border transition-all ${
                 idx === currentBannerIdx
