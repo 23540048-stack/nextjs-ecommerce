@@ -24,19 +24,15 @@ export interface Product {
   _id?: string;
   name: string;
   subCategory?: string;
-
-  // Giá gốc lưu trong database bằng USD
   price: number;
-
-  // Giá đã format để hiển thị
   displayPrice: string;
-
   image?: string;
   hoverImage?: string;
   badge?: "LIMITED" | "NEW" | undefined;
   rating?: number;
   categoryId?: string;
   categorySlug?: string;
+  collectionId?: string;
   inStock?: boolean;
   stock?: number;
   countInStock?: number;
@@ -61,7 +57,6 @@ export default function ProductDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // Unwrap params từ Promise bằng React.use()
   const resolvedParams = use(params);
   const id = resolvedParams.id;
 
@@ -79,7 +74,6 @@ export default function ProductDetailPage({
         // ============================================
         // 1. FETCH SẢN PHẨM CHÍNH
         // ============================================
-
         const res = await api.get(`/products/${id}`);
         const data = res.data?.data || res.data;
 
@@ -90,10 +84,8 @@ export default function ProductDetailPage({
         }
 
         const catObj = typeof data.category === "object" ? data.category : null;
-
-        // ============================================
-        // PRICE
-        // ============================================
+        const collectionObj =
+          typeof data.collection === "object" ? data.collection : null;
 
         const usdPrice =
           typeof data.price === "number"
@@ -107,10 +99,6 @@ export default function ProductDetailPage({
           maximumFractionDigits: 2,
         }).format(usdPrice);
 
-        // ============================================
-        // STOCK & AVAILABILITY CHECKING (ĐÃ BỔ SUNG)
-        // ============================================
-
         const isProductInStock =
           typeof data.inStock === "boolean"
             ? data.inStock
@@ -122,10 +110,6 @@ export default function ProductDetailPage({
                   ? data.gearCount > 0
                   : true;
 
-        // ============================================
-        // PRODUCT IMAGE
-        // ============================================
-
         const productImages =
           data.images && data.images.length > 0
             ? data.images
@@ -134,50 +118,29 @@ export default function ProductDetailPage({
                   "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1000",
               ];
 
-        // ============================================
-        // FORMAT PRODUCT
-        // ============================================
-
         const formattedProduct = {
           ...data,
-
           id: String(data._id || data.id || id),
-
           _id: data._id,
-
           name: data.name,
-
           subCategory:
+            collectionObj?.name?.toUpperCase() ||
             catObj?.name?.toUpperCase() ||
             data.subCategory ||
             "SHINOBI EQUIPMENT",
-
-          // Trạng thái tồn kho đã qua tính toán
           inStock: isProductInStock,
           stock: data.stock,
           countInStock: data.countInStock,
           gearCount: data.gearCount,
-
-          // Giá số gốc USD
           price: usdPrice,
-
-          // Giá hiển thị USD
           displayPrice: formattedUsdString,
-
           priceUsd: usdPrice,
-
           badge: data.badge || (data.isFeatured ? "LIMITED" : undefined),
-
           rating: data.rating || 0,
-
           reviewsCount: data.reviewsCount || data.reviews?.length || 0,
-
           description: data.description || "No detailed description available.",
-
           sizes: Array.isArray(data.sizes) ? data.sizes : [],
-
           images: productImages,
-
           specs: data.specs || [
             {
               label: "MATERIAL",
@@ -199,10 +162,8 @@ export default function ProductDetailPage({
         // ============================================
         // 2. FETCH REVIEWS
         // ============================================
-
         try {
           const revRes = await api.get(`/products/${id}/reviews`);
-
           const revList = Array.isArray(revRes.data)
             ? revRes.data
             : revRes.data?.data || [];
@@ -218,7 +179,6 @@ export default function ProductDetailPage({
               verified: r.verified ?? true,
               sizeBought: r.sizeBought || r.size || "",
               comment: r.comment || r.content || "",
-
               images: Array.isArray(r.images)
                 ? r.images
                     .map((img: any) => {
@@ -233,7 +193,6 @@ export default function ProductDetailPage({
                     })
                     .filter(Boolean)
                 : [],
-
               likes: r.likes || 0,
             })),
           );
@@ -244,22 +203,70 @@ export default function ProductDetailPage({
         }
 
         // ============================================
-        // 3. FETCH RELATED PRODUCTS
+        // 3. FETCH RELATED PRODUCTS BY COLLECTION
         // ============================================
-
         try {
-          const catId = catObj?._id || data.category;
+          // Lấy ID Collection (hoặc ID Category nếu backend dùng chung)
+          let collectionId = "";
+          if (typeof data.collection === "object" && data.collection !== null) {
+            collectionId = data.collection._id || data.collection.id || "";
+          } else if (typeof data.collection === "string") {
+            collectionId = data.collection;
+          } else if (
+            typeof data.category === "object" &&
+            data.category !== null
+          ) {
+            collectionId = data.category._id || data.category.id || "";
+          } else if (typeof data.category === "string") {
+            collectionId = data.category;
+          }
 
-          const relatedRes = await api.get(
-            `/products?category=${catId}&limit=4`,
+          let rawRelated: any[] = [];
+
+          // 1. Tìm sản phẩm trong cùng Collection
+          if (collectionId) {
+            const relatedRes = await api
+              .get(`/products?collection=${collectionId}&limit=6`)
+              .catch(() => null);
+
+            const resData = relatedRes?.data;
+            rawRelated = Array.isArray(resData) ? resData : resData?.data || [];
+
+            // Dự phòng nếu API không hỗ trợ query param `collection` mà dùng `category`
+            if (rawRelated.length === 0) {
+              const catRes = await api
+                .get(`/products?category=${collectionId}&limit=6`)
+                .catch(() => null);
+
+              const catData = catRes?.data;
+              rawRelated = Array.isArray(catData)
+                ? catData
+                : catData?.data || [];
+            }
+          }
+
+          // Lọc bỏ sản phẩm hiện tại đang xem
+          let filteredRelated = rawRelated.filter(
+            (item: any) => String(item._id || item.id) !== String(id),
           );
 
-          const rawRelated = Array.isArray(relatedRes.data)
-            ? relatedRes.data
-            : relatedRes.data?.data || [];
+          // 2. GỢI Ý DỰ PHÒNG: Nếu Collection này không có SP khác -> Lấy các SP mới nhất từ Collection khác
+          if (filteredRelated.length === 0) {
+            const fallbackRes = await api
+              .get(`/products?limit=6&sortBy=newest`)
+              .catch(() => null);
 
-          const formattedRelated = rawRelated
-            .filter((item: any) => String(item._id || item.id) !== id)
+            const fallbackData = fallbackRes?.data;
+            const rawFallback = Array.isArray(fallbackData)
+              ? fallbackData
+              : fallbackData?.data || [];
+
+            filteredRelated = rawFallback.filter(
+              (item: any) => String(item._id || item.id) !== String(id),
+            );
+          }
+
+          const formattedRelated = filteredRelated
             .slice(0, 3)
             .map((item: any) => {
               const itemPriceUsd =
@@ -287,35 +294,27 @@ export default function ProductDetailPage({
 
               return {
                 id: String(item._id || item.id),
-
                 _id: item._id,
-
                 name: item.name,
-
                 subCategory:
-                  item.category?.name?.toUpperCase() || "ACCESSORIES",
-
+                  item.collection?.name?.toUpperCase() ||
+                  item.category?.name?.toUpperCase() ||
+                  "ACCESSORIES",
                 price: itemPriceUsd,
-
                 displayPrice: formattedItemPrice,
-
                 priceUsd: itemPriceUsd,
-
                 image:
                   item.images && item.images.length > 0
                     ? item.images[0]
                     : item.image ||
                       "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?q=80&w=1000",
-
                 hoverImage:
                   item.images && item.images.length > 1
                     ? item.images[1]
                     : item.images && item.images.length > 0
                       ? item.images[0]
                       : item.image,
-
                 badge: item.badge || (item.isFeatured ? "LIMITED" : undefined),
-
                 stock: item.stock,
                 inStock: isRelatedInStock,
                 countInStock: item.countInStock,
@@ -329,7 +328,6 @@ export default function ProductDetailPage({
         }
       } catch (error) {
         console.error("Error loading product details:", error);
-
         toast.error("Failed to load product details");
       } finally {
         setLoading(false);
@@ -341,13 +339,8 @@ export default function ProductDetailPage({
     }
   }, [id]);
 
-  // ============================================
-  // RATING BREAKDOWN
-  // ============================================
-
   const ratingBreakdown = React.useMemo(() => {
     const total = reviews.length || 1;
-
     const counts = [0, 0, 0, 0, 0];
 
     reviews.forEach((r) => {
@@ -358,7 +351,6 @@ export default function ProductDetailPage({
 
     return [5, 4, 3, 2, 1].map((stars) => {
       const count = counts[stars - 1];
-
       const percentage = Math.round((count / total) * 100) + "%";
 
       return {
@@ -368,10 +360,6 @@ export default function ProductDetailPage({
       };
     });
   }, [reviews]);
-
-  // ============================================
-  // LIKE REVIEW
-  // ============================================
 
   const handleLikeReview = (reviewId: string) => {
     setReviews((prev) =>
@@ -394,24 +382,19 @@ export default function ProductDetailPage({
 
       <main className="grow py-8 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         {/* BREADCRUMB */}
-
         <div className="flex items-center justify-between gap-4 mb-8">
           <nav className="flex items-center gap-2.5 text-xs sm:text-sm tracking-widest text-brand-dark/60 uppercase">
             <Link href="/" className="hover:text-orange-500 transition-colors">
               HOME
             </Link>
-
             <ChevronRight size={16} className="text-brand-dark/40" />
-
             <Link
               href="/shop"
               className="hover:text-orange-500 transition-colors"
             >
               PRODUCTS
             </Link>
-
             <ChevronRight size={16} className="text-brand-dark/40" />
-
             <span className="text-brand-dark font-bold truncate max-w-40 sm:max-w-none">
               {loading ? "LOADING..." : product?.name || "ARCHIVE ITEM"}
             </span>
@@ -419,7 +402,6 @@ export default function ProductDetailPage({
         </div>
 
         {/* LOADING */}
-
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 py-12 animate-pulse">
             <div className="w-full h-[450px] bg-brand-dark/10 border border-brand-dark/20 flex items-center justify-center">
@@ -428,41 +410,33 @@ export default function ProductDetailPage({
 
             <div className="space-y-6">
               <div className="h-4 bg-brand-dark/10 w-1/3" />
-
               <div className="h-10 bg-brand-dark/10 w-4/5" />
-
               <div className="h-8 bg-brand-dark/10 w-1/4" />
-
               <div className="h-24 bg-brand-dark/10 w-full" />
-
               <div className="h-12 bg-orange-500/20 w-full" />
             </div>
           </div>
         ) : product ? (
           <>
-            {/* PRODUCT DETAIL */}
-
+            {/* PRODUCT DETAIL & RELATED PRODUCTS */}
             <ProductDetail
               product={{
                 ...product,
                 price: product.displayPrice,
                 displayPrice: product.displayPrice,
                 priceUsd: product.price,
-                inStock: product.inStock, // Đảm bảo truyền thuộc tính inStock chuẩn xác xuống ProductDetail
-
+                inStock: product.inStock,
                 rating:
                   reviews.length > 0
                     ? reviews.reduce((acc, cur) => acc + cur.rating, 0) /
                       reviews.length
                     : product.rating,
-
                 reviewsCount: reviews.length || product.reviewsCount,
               }}
               relatedProducts={relatedProducts}
             />
 
             {/* REVIEWS */}
-
             <section className="mt-16 pt-12 border-t-2 border-brand-dark space-y-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-dark/15 pb-4">
                 <div>
@@ -478,7 +452,6 @@ export default function ProductDetailPage({
 
                 <div className="flex items-center gap-2 text-xs font-bold bg-brand-dark text-white px-3 py-1.5 self-start sm:self-auto">
                   <MessageSquare size={14} className="text-orange-400" />
-
                   <span>
                     {reviews.length || product.reviewsCount || 0} TOTAL REPORTS
                   </span>
@@ -486,7 +459,6 @@ export default function ProductDetailPage({
               </div>
 
               {/* RATING OVERVIEW */}
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-white border border-brand-dark/20 p-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
                 <div className="flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-brand-dark/15 pb-6 md:pb-0 md:pr-6 text-center">
                   <span className="text-5xl font-extrabold text-brand-dark tracking-tight">
@@ -526,7 +498,6 @@ export default function ProductDetailPage({
                     >
                       <div className="flex items-center gap-1 w-12 text-brand-dark font-bold">
                         <span>{item.stars}</span>
-
                         <Star
                           size={12}
                           className="fill-amber-500 text-amber-500"
@@ -551,7 +522,6 @@ export default function ProductDetailPage({
               </div>
 
               {/* REVIEWS LIST */}
-
               <div className="space-y-4">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-brand-dark flex items-center gap-2">
                   <Camera size={16} className="text-orange-500" />
@@ -646,7 +616,6 @@ export default function ProductDetailPage({
                             className="flex items-center gap-1.5 text-[11px] text-brand-dark/60 hover:text-orange-600 transition-colors cursor-pointer"
                           >
                             <ThumbsUp size={12} />
-
                             <span>Helpful ({review.likes})</span>
                           </button>
                         </div>
@@ -657,8 +626,7 @@ export default function ProductDetailPage({
               </div>
             </section>
 
-            {/* RECENT INSPECTIONS */}
-
+            {/* RECENT INSPECTIONS (SẢN PHẨM VỪA XEM) */}
             <RecentInspections
               currentProduct={{
                 id: product.id,
@@ -667,7 +635,6 @@ export default function ProductDetailPage({
                 price: product.displayPrice,
                 image: product.images[0],
                 badge: product.badge,
-
                 stock: product.stock,
                 inStock: product.inStock,
                 gearCount: product.gearCount,
@@ -679,12 +646,10 @@ export default function ProductDetailPage({
             <h2 className="text-2xl font-bold uppercase">
               EQUIPMENT NOT FOUND
             </h2>
-
             <p className="text-xs text-brand-dark/60">
               The requested item code does not exist in the Leaf Village
               archives.
             </p>
-
             <Link
               href="/shop"
               className="inline-block bg-orange-500 text-white px-6 py-2.5 text-xs font-bold uppercase tracking-widest hover:bg-orange-600 transition-colors"
