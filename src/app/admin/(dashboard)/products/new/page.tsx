@@ -52,7 +52,6 @@ export default function NewProductPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // State quản lý Toast thành công & Modal cảnh báo thoát
   const [showToast, setShowToast] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
@@ -83,15 +82,15 @@ export default function NewProductPage() {
     fetchCategories();
   }, [fetchCategories]);
 
-  const handleImagesChange = (imgs: string[]) => {
+  // Bọc useCallback để tránh re-render gián đoạn event của component con
+  const handleImagesChange = useCallback((imgs: string[]) => {
     setFormData((prev) => ({ ...prev, imagesList: imgs }));
-  };
+  }, []);
 
-  const handleVideosChange = (videos: string[]) => {
+  const handleVideosChange = useCallback((videos: string[]) => {
     setFormData((prev) => ({ ...prev, videosList: videos }));
-  };
+  }, []);
 
-  // 🟢 QUẢN LÝ XỬ LÝ SIZES
   const handleAddSize = () => {
     const trimmed = sizeInput.trim().toUpperCase();
     if (trimmed && !formData.sizes.includes(trimmed)) {
@@ -117,7 +116,6 @@ export default function NewProductPage() {
     }
   };
 
-  // 🟢 KIỂM TRA XEM FORM ĐÃ CÓ DỮ LIỆU NHẬP DỞ HAY CHƯA
   const isFormDirty = () => {
     return (
       formData.name.trim() !== "" ||
@@ -182,7 +180,6 @@ export default function NewProductPage() {
 
       await api.post("/products", payload);
 
-      // Hiển thị Toast thông báo tiếng Anh thành công
       setShowToast(true);
 
       setTimeout(() => {
@@ -200,7 +197,7 @@ export default function NewProductPage() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto font-mono relative">
-      {/* 🟢 TOAST NOTIFICATION (English) */}
+      {/* TOAST NOTIFICATION SUCCESS */}
       {showToast && (
         <div className="fixed top-5 right-5 z-50 bg-emerald-600 text-white px-4 py-3 border-2 border-brand-dark shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-3 animate-bounce">
           <CheckCircle2 size={20} />
@@ -236,11 +233,13 @@ export default function NewProductPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Liên kết nút bấm với Form bằng attribute form="create-product-form" */}
           <Button
+            type="submit"
+            form="create-product-form"
             variant="chakra"
             size="sm"
             icon={PlusCircle}
-            onClick={handleSubmit}
             disabled={isSubmitting}
           >
             {isSubmitting ? "SEALING..." : "CREATE GEAR"}
@@ -248,18 +247,26 @@ export default function NewProductPage() {
         </div>
       </div>
 
-      {/* ERROR NOTICE */}
+      {/* ERROR NOTICE - Cố định vị trí hiển thị để không đẩy layout xuống */}
       {errorMsg && (
         <div className="p-4 bg-rose-50 border-2 border-rose-600 text-rose-600 text-xs font-bold flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(225,29,72,1)]">
           <div className="flex items-center gap-2">
             <AlertCircle size={18} />
             <span>{errorMsg}</span>
           </div>
+          <button
+            type="button"
+            onClick={() => setErrorMsg("")}
+            className="hover:opacity-75"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
       {/* FORM CREATE */}
       <form
+        id="create-product-form"
         onSubmit={handleSubmit}
         className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
@@ -275,7 +282,7 @@ export default function NewProductPage() {
               placeholder="e.g. KUSANAGI SWORD"
               value={formData.name}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
               }
               required
             />
@@ -285,18 +292,17 @@ export default function NewProductPage() {
               placeholder="e.g. SWD-001"
               value={formData.sku}
               onChange={(e) =>
-                setFormData({ ...formData, sku: e.target.value })
+                setFormData((prev) => ({ ...prev, sku: e.target.value }))
               }
             />
 
-            {/* 🟢 KHU VỰC THÔNG SỐ BỔ SUNG (MATERIAL, ORIGIN, QUALITY) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input
                 label="Material"
                 placeholder="Heavyweight Cotton Canvas"
                 value={formData.material}
                 onChange={(e) =>
-                  setFormData({ ...formData, material: e.target.value })
+                  setFormData((prev) => ({ ...prev, material: e.target.value }))
                 }
               />
               <Input
@@ -304,7 +310,7 @@ export default function NewProductPage() {
                 placeholder="Leaf Village Archives"
                 value={formData.origin}
                 onChange={(e) =>
-                  setFormData({ ...formData, origin: e.target.value })
+                  setFormData((prev) => ({ ...prev, origin: e.target.value }))
                 }
               />
               <Input
@@ -312,12 +318,11 @@ export default function NewProductPage() {
                 placeholder="Standard Shinobi"
                 value={formData.quality}
                 onChange={(e) =>
-                  setFormData({ ...formData, quality: e.target.value })
+                  setFormData((prev) => ({ ...prev, quality: e.target.value }))
                 }
               />
             </div>
 
-            {/* KHU VỰC NHẬP SIZES */}
             <div className="space-y-2">
               <label className="text-xs font-mono font-bold text-brand-dark uppercase block">
                 Available Sizes (Optional)
@@ -330,7 +335,7 @@ export default function NewProductPage() {
                   value={sizeInput}
                   onChange={(e) => setSizeInput(e.target.value)}
                   onKeyDown={handleSizeKeyDown}
-                  className="flex-1 bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-mono font-bold focus:outline-hidden focus:border-orange-600 uppercase"
+                  className="flex-1 bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-mono font-bold focus:outline-none focus:border-orange-600 uppercase"
                 />
                 <button
                   type="button"
@@ -341,7 +346,6 @@ export default function NewProductPage() {
                 </button>
               </div>
 
-              {/* DANH SÁCH SIZES ĐÃ THÊM */}
               {formData.sizes.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-1">
                   {formData.sizes.map((s) => (
@@ -392,9 +396,12 @@ export default function NewProductPage() {
                 placeholder="Enter item lore, specs, or usage requirements..."
                 value={formData.description}
                 onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
                 }
-                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2.5 text-xs font-mono focus:outline-hidden focus:border-orange-600"
+                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2.5 text-xs font-mono focus:outline-none focus:border-orange-600"
               />
             </div>
           </div>
@@ -411,7 +418,7 @@ export default function NewProductPage() {
                 placeholder="0"
                 value={formData.price}
                 onChange={(e) =>
-                  setFormData({ ...formData, price: e.target.value })
+                  setFormData((prev) => ({ ...prev, price: e.target.value }))
                 }
                 required
               />
@@ -422,7 +429,7 @@ export default function NewProductPage() {
                 placeholder="0"
                 value={formData.stock}
                 onChange={(e) =>
-                  setFormData({ ...formData, stock: e.target.value })
+                  setFormData((prev) => ({ ...prev, stock: e.target.value }))
                 }
                 required
               />
@@ -443,9 +450,9 @@ export default function NewProductPage() {
               <select
                 value={formData.status}
                 onChange={(e) =>
-                  setFormData({ ...formData, status: e.target.value })
+                  setFormData((prev) => ({ ...prev, status: e.target.value }))
                 }
-                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-mono font-bold focus:outline-hidden focus:border-orange-600"
+                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-mono font-bold focus:outline-none focus:border-orange-600"
               >
                 <option value="ACTIVE">ACTIVE (In Stock)</option>
                 <option value="LOW_STOCK">LOW STOCK (Warning)</option>
@@ -461,10 +468,10 @@ export default function NewProductPage() {
               <select
                 value={formData.category}
                 onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
+                  setFormData((prev) => ({ ...prev, category: e.target.value }))
                 }
                 required
-                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-mono font-bold focus:outline-hidden focus:border-orange-600"
+                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-mono font-bold focus:outline-none focus:border-orange-600"
               >
                 <option value="">-- SELECT CATEGORY --</option>
                 {categories.map((cat) => (
@@ -479,7 +486,7 @@ export default function NewProductPage() {
         </div>
       </form>
 
-      {/* 🟢 MODAL CẢNH BÁO HỦY KHI ĐANG NHẬP DỞ DỮ LIỆU */}
+      {/* MODAL CẢNH BÁO HỦY */}
       <Modal
         isOpen={isCancelModalOpen}
         onClose={() => setIsCancelModalOpen(false)}
