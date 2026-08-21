@@ -120,24 +120,6 @@ export default function LoginPage() {
 
       console.log("LOGIN RESPONSE:", response.data);
 
-      // --------------------------------------------------------
-      // BACKEND RESPONSE
-      //
-      // Backend expected:
-      //
-      // {
-      //   user: {
-      //     id,
-      //     name,
-      //     email,
-      //     role
-      //   }
-      // }
-      //
-      // JWT is stored in HttpOnly Cookie by backend.
-      // Frontend does NOT receive or store the JWT.
-      // --------------------------------------------------------
-
       const user = response.data?.user;
 
       if (!user) {
@@ -167,10 +149,6 @@ export default function LoginPage() {
 
       // --------------------------------------------------------
       // SAVE USER TO ZUSTAND
-      //
-      // IMPORTANT:
-      // No token here.
-      // JWT remains in HttpOnly Cookie.
       // --------------------------------------------------------
 
       setAuth(user);

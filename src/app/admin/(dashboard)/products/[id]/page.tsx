@@ -43,7 +43,7 @@ export default function EditProductPage({
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
-    category: "", // Lưu ID dạng string
+    category: "",
     price: "",
     stock: "",
     status: "ACTIVE",
@@ -58,7 +58,7 @@ export default function EditProductPage({
     quality: "Standard Shinobi",
   });
 
-  const [initialFormData, setInitialFormData] = useState<string>(""); // Dùng để check form có bị thay đổi không
+  const [initialFormData, setInitialFormData] = useState<string>("");
   const [sizeInput, setSizeInput] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -172,7 +172,6 @@ export default function EditProductPage({
     }));
   };
 
-  // 🟢 QUẢN LÝ XỬ LÝ SIZES
   const handleAddSize = () => {
     const trimmed = sizeInput.trim().toUpperCase();
     if (trimmed && !formData.sizes.includes(trimmed)) {
@@ -198,7 +197,6 @@ export default function EditProductPage({
     }
   };
 
-  // 🟢 CHECK FORM XEM CÓ BỊ EDIT CHƯA LƯU KHÔNG
   const isFormDirty = () => {
     return JSON.stringify(formData) !== initialFormData;
   };

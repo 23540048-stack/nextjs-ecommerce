@@ -103,7 +103,6 @@ export default function CartPage() {
 
           slug: product.slug || item.slug || "",
 
-          // Backend price is already USD
           price,
 
           quantity: Number(item.quantity) || 1,

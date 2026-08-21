@@ -155,7 +155,7 @@ export default function AdminCategoriesPage() {
       setIsCategoryModalOpen(false);
     } catch (error: any) {
       console.error("Failed to save category:", error);
-      alert(error.response?.data?.message || "Lưu danh mục thất bại.");
+      alert(error.response?.data?.message || "Failed to save category.");
     } finally {
       setIsSubmitting(false);
     }
@@ -172,7 +172,7 @@ export default function AdminCategoriesPage() {
       setDeleteTarget(null);
     } catch (error: any) {
       console.error("Failed to delete category:", error);
-      alert(error.response?.data?.message || "Không thể xóa danh mục này!");
+      alert(error.response?.data?.message || "Cannot delete this category!");
     } finally {
       setIsSubmitting(false);
     }

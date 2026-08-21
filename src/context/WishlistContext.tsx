@@ -24,7 +24,7 @@ const WishlistContext = createContext<WishlistContextType | undefined>(
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const [wishlistItems, setWishlistItems] = useState<WishlistMapItem[]>([]);
 
-  // 🟢 Kiểm tra đăng nhập chỉ dựa vào user từ AuthStore
+  // Kiểm tra đăng nhập chỉ dựa vào user từ AuthStore
   const user = useAuthStore((state) => state.user);
   const isLoggedIn = Boolean(user);
 

@@ -11,8 +11,6 @@ export interface ViewedItem {
   price: string;
   image: string;
   badge?: "NEW" | "LIMITED";
-
-  // Bổ sung thuộc tính kiểm tra tồn kho
   stock?: number;
   inStock?: boolean;
   gearCount?: number;

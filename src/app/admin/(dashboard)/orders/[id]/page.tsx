@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
@@ -19,7 +19,7 @@ import {
   ShieldAlert,
   Send,
   History,
-  Tag,
+  Loader2,
 } from "lucide-react";
 
 type OrderStatus =
@@ -64,127 +64,128 @@ interface OrderDetail {
   }[];
 }
 
-// Giả lập cơ sở dữ liệu đơn hàng
-const MOCK_ORDER_DATA: Record<string, OrderDetail> = {
-  "ORD-8801": {
-    id: "ORD-8801",
-    customerName: "Uzumaki Naruto",
-    customerRank: "Seventh Hokage",
-    village: "Konohagakure (Làng Lá)",
-    address: "Tòa nhà Hokage, Phố Ichiraku, Làng Lá",
-    phone: "0901-777-888",
-    email: "naruto.hokage@konoha.gov",
-    createdAt: "2026-08-12 10:30",
-    subtotal: 1700000,
-    shippingFee: 50000,
-    discount: 50000,
-    totalAmount: 1700000,
-    paymentMethod: "Chakra Pay",
-    paymentStatus: "PAID",
-    status: "PROCESSING",
-    note: "Giao gấp trước giờ ăn trưa tại quán Ramen Ichiraku!",
-    items: [
-      {
-        id: "GEAR-1001",
-        name: "Kusanagi Sword (Grass Cutter)",
-        sku: "KSN-SWD-01",
-        image:
-          "https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=150&q=80",
-        price: 1250000,
-        quantity: 1,
-      },
-      {
-        id: "GEAR-1002",
-        name: "Flying Raijin Kunai (x10)",
-        sku: "FRJ-KN-10",
-        image:
-          "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=150&q=80",
-        price: 450000,
-        quantity: 1,
-      },
-    ],
-    logs: [
-      {
-        time: "2026-08-12 10:30",
-        action: "Nhiệm vụ được khởi tạo bởi khách hàng",
-        actor: "Uzumaki Naruto",
-      },
-      {
-        time: "2026-08-12 10:32",
-        action: "Thanh toán thành công qua Chakra Pay",
-        actor: "System",
-      },
-      {
-        time: "2026-08-12 11:00",
-        action: "Xác nhận cuộn nhiệm vụ & Đang chuẩn bị hàng",
-        actor: "Admin Tsunade",
-      },
-    ],
-  },
-};
-
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const orderId = (params?.id as string) || "ORD-8801";
+  const orderId = params?.id as string;
 
-  // Lấy thông tin đơn hàng hoặc dùng mẫu mặc định
-  const [order, setOrder] = useState<OrderDetail>(
-    MOCK_ORDER_DATA[orderId] || {
-      ...MOCK_ORDER_DATA["ORD-8801"],
-      id: orderId,
-    },
-  );
-
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [newLogNote, setNewLogNote] = useState("");
 
-  // Cập nhật trạng thái đơn hàng
-  const handleUpdateStatus = (newStatus: OrderStatus) => {
+  // Fetch order data from Backend
+  useEffect(() => {
+    if (!orderId) return;
+
+    const fetchOrderDetail = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`/api/orders/${orderId}`);
+
+        if (!response.ok) {
+          throw new Error("Failed to load order details");
+        }
+
+        const data: OrderDetail = await response.json();
+        setOrder(data);
+      } catch (err: any) {
+        setError(
+          err.message || "An error occurred while connecting to the server",
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrderDetail();
+  }, [orderId]);
+
+  // Update order status
+  const handleUpdateStatus = async (newStatus: OrderStatus) => {
+    if (!order) return;
+
     const updatedLogs = [
       ...order.logs,
       {
         time: new Date().toLocaleString("sv-SE").replace(" ", " ").slice(0, 16),
-        action: `Trạng thái thay đổi thành: ${newStatus}`,
+        action: `Status changed to: ${newStatus}`,
         actor: "Admin Jonin",
       },
     ];
 
-    setOrder((prev) => ({
-      ...prev,
-      status: newStatus,
-      paymentStatus:
-        newStatus === "DELIVERED"
-          ? "PAID"
-          : newStatus === "CANCELLED"
-            ? "REFUNDED"
-            : prev.paymentStatus,
-      logs: updatedLogs,
-    }));
+    const nextPaymentStatus: PaymentStatus =
+      newStatus === "DELIVERED"
+        ? "PAID"
+        : newStatus === "CANCELLED"
+          ? "REFUNDED"
+          : order.paymentStatus;
+
+    // Optimistic UI Update
+    setOrder((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: newStatus,
+            paymentStatus: nextPaymentStatus,
+            logs: updatedLogs,
+          }
+        : null,
+    );
+
+    // Send update request to Backend
+    try {
+      await fetch(`/api/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: newStatus,
+          paymentStatus: nextPaymentStatus,
+          log: updatedLogs[updatedLogs.length - 1],
+        }),
+      });
+    } catch (err) {
+      console.error("Error updating status on server:", err);
+    }
   };
 
-  // Thêm ghi chú nhật ký
-  const handleAddLog = (e: React.FormEvent) => {
+  // Add log note
+  const handleAddLog = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newLogNote.trim()) return;
+    if (!newLogNote.trim() || !order) return;
 
-    setOrder((prev) => ({
-      ...prev,
-      logs: [
-        ...prev.logs,
-        {
-          time: new Date()
-            .toLocaleString("sv-SE")
-            .replace(" ", " ")
-            .slice(0, 16),
-          action: `Ghi chú: ${newLogNote}`,
-          actor: "Admin Jonin",
-        },
-      ],
-    }));
+    const newLogItem = {
+      time: new Date().toLocaleString("sv-SE").replace(" ", " ").slice(0, 16),
+      action: `Note: ${newLogNote}`,
+      actor: "Admin Jonin",
+    };
+
+    setOrder((prev) =>
+      prev
+        ? {
+            ...prev,
+            logs: [...prev.logs, newLogItem],
+          }
+        : null,
+    );
+
     setNewLogNote("");
+
+    // Send new log to Backend
+    try {
+      await fetch(`/api/orders/${orderId}/logs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newLogItem),
+      });
+    } catch (err) {
+      console.error("Error sending log to server:", err);
+    }
   };
 
-  // Badge hiển thị trạng thái
+  // Render Status Badge
   const renderStatusBadge = (status: OrderStatus) => {
     switch (status) {
       case "PENDING":
@@ -219,6 +220,32 @@ export default function OrderDetailPage() {
         );
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] font-mono">
+        <Loader2 className="animate-spin text-orange-600 mb-2" size={32} />
+        <p className="text-xs text-brand-dark/70 font-bold uppercase">
+          Fetching Mission Scroll...
+        </p>
+      </div>
+    );
+  }
+
+  if (error || !order) {
+    return (
+      <div className="p-8 text-center font-mono border-2 border-brand-dark bg-white space-y-4">
+        <p className="text-rose-600 font-bold text-sm">
+          {error || "Order scroll not found!"}
+        </p>
+        <Link href="/admin/orders">
+          <Button variant="outline" size="sm" icon={ArrowLeft}>
+            BACK TO ORDERS
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 font-mono text-xs text-brand-dark pb-10">
@@ -346,7 +373,7 @@ export default function OrderDetailPage() {
                         SKU: {item.sku} | ID: #{item.id}
                       </div>
                       <div className="text-xs font-bold text-orange-600 mt-1">
-                        {item.price.toLocaleString("vi-VN")} VND
+                        {item.price.toLocaleString("en-US")} VND
                       </div>
                     </div>
                   </div>
@@ -360,7 +387,7 @@ export default function OrderDetailPage() {
                         Qty: {item.quantity}
                       </div>
                       <div className="font-bold text-sm text-brand-dark mt-0.5">
-                        {(item.quantity * item.price).toLocaleString("vi-VN")}{" "}
+                        {(item.quantity * item.price).toLocaleString("en-US")}{" "}
                         VND
                       </div>
                     </div>
@@ -374,19 +401,19 @@ export default function OrderDetailPage() {
               <div className="flex justify-between text-xs text-brand-dark/80">
                 <span>Subtotal (Equipment Cost):</span>
                 <span className="font-bold">
-                  {order.subtotal.toLocaleString("vi-VN")} VND
+                  {order.subtotal.toLocaleString("en-US")} VND
                 </span>
               </div>
               <div className="flex justify-between text-xs text-brand-dark/80">
                 <span>Ninja Courier Fee (Express Delivery):</span>
                 <span className="font-bold">
-                  {order.shippingFee.toLocaleString("vi-VN")} VND
+                  {order.shippingFee.toLocaleString("en-US")} VND
                 </span>
               </div>
               {order.discount > 0 && (
                 <div className="flex justify-between text-xs text-emerald-700 font-bold">
                   <span>Village Scroll Coupon Discount:</span>
-                  <span>-{order.discount.toLocaleString("vi-VN")} VND</span>
+                  <span>-{order.discount.toLocaleString("en-US")} VND</span>
                 </div>
               )}
               <div className="pt-2 border-t-2 border-brand-dark flex justify-between items-center text-sm font-bold">
@@ -394,7 +421,7 @@ export default function OrderDetailPage() {
                   Grand Total (Ryo):
                 </span>
                 <span className="text-orange-600 text-lg">
-                  {order.totalAmount.toLocaleString("vi-VN")} VND
+                  {order.totalAmount.toLocaleString("en-US")} VND
                 </span>
               </div>
             </div>

@@ -24,7 +24,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
-  // 🟢 Kiểm tra trạng thái đăng nhập chỉ dựa trên object user
+  // Kiểm tra trạng thái đăng nhập chỉ dựa trên object user
   const user = useAuthStore((state) => state.user);
   const isLoggedIn = Boolean(user);
 
@@ -36,7 +36,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const items = Array.isArray(data) ? data : data.items || [];
       setCartItems(items);
     } catch (error: any) {
-      // 🔴 Nếu nhận lỗi 401: Xóa user rác khỏi Zustand Store & Reset giỏ hàng
+      // Nếu nhận lỗi 401: Xóa user rác khỏi Zustand Store & Reset giỏ hàng
       if (error?.response?.status === 401) {
         useAuthStore.getState().logout();
         setCartItems([]);

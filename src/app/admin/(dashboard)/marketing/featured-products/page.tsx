@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import toast, { Toaster } from "react-hot-toast";
 import {
@@ -15,6 +15,8 @@ import {
   ArrowUpDown,
   Image as ImageIcon,
   Loader2,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
@@ -47,10 +49,10 @@ export interface FeaturedProductItem {
 
 export default function FeaturedProductsPage() {
   const [featuredList, setFeaturedList] = useState<FeaturedProductItem[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Filter & Search ở Bảng ngoài Trang
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
@@ -66,7 +68,16 @@ export default function FeaturedProductsPage() {
     status: "active" as FeaturedProductItem["status"],
   });
 
-  // HELPER: Map Badge Variant theo Badge Component
+  // State tìm kiếm sản phẩm realtime từ Database Backend cho Modal
+  const [productSearchInput, setProductSearchInput] = useState("");
+  const [searchedProducts, setSearchedProducts] = useState<Product[]>([]);
+  const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [selectedProductObj, setSelectedProductObj] = useState<Product | null>(
+    null,
+  );
+
+  // HELPER: Map Badge Variant
   const getBadgeVariant = (
     label: string,
   ): "new" | "limited" | "orange" | "danger" | "default" => {
@@ -112,44 +123,68 @@ export default function FeaturedProductsPage() {
     }
   }, [searchQuery, categoryFilter]);
 
-  // 2. FETCH ALL PRODUCTS & CATEGORIES
-  const fetchMetadata = useCallback(async () => {
+  // 2. FETCH CATEGORIES
+  const fetchCategories = useCallback(async () => {
     try {
-      const [prodRes, catRes] = await Promise.all([
-        api.get("/products"),
-        api.get("/categories"),
-      ]);
-      setAllProducts(prodRes.data?.data || prodRes.data || []);
+      const catRes = await api.get("/categories");
       setCategories(catRes.data?.data || catRes.data || []);
     } catch (error) {
-      console.error("Failed to fetch products/categories:", error);
+      console.error("Failed to fetch categories:", error);
     }
   }, []);
 
   useEffect(() => {
     fetchFeaturedProducts();
-    fetchMetadata();
-  }, [fetchFeaturedProducts, fetchMetadata]);
+    fetchCategories();
+  }, [fetchFeaturedProducts, fetchCategories]);
+
+  // 3. DYNAMIC SEARCH TOÀN BỘ DATABASE SẢN PHẨM KHI CÓ TỪ KHÓA TÌM KIẾM
+  useEffect(() => {
+    if (!isFormModalOpen) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsSearchingProducts(true);
+        const res = await api.get(
+          `/products?search=${encodeURIComponent(productSearchInput.trim())}`,
+        );
+        const list = res.data?.data || res.data || [];
+        setSearchedProducts(Array.isArray(list) ? list : []);
+      } catch (err) {
+        console.error("Failed to search products from database:", err);
+      } finally {
+        setIsSearchingProducts(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [productSearchInput, isFormModalOpen]);
 
   const handleOpenAddModal = () => {
     setSelectedFeatured(null);
+    setSelectedProductObj(null);
     setFormData({
-      productId: allProducts.length > 0 ? allProducts[0]._id : "",
+      productId: "",
       badgeLabel: "HOT",
       displayOrder: (featuredList.length + 1).toString(),
       status: "active",
     });
+    setProductSearchInput("");
+    setIsProductDropdownOpen(false);
     setIsFormModalOpen(true);
   };
 
   const handleOpenEditModal = (item: FeaturedProductItem) => {
     setSelectedFeatured(item);
+    setSelectedProductObj(item.productId || null);
     setFormData({
       productId: item.productId?._id || "",
       badgeLabel: item.badgeLabel || "HOT",
       displayOrder: item.displayOrder ? item.displayOrder.toString() : "1",
       status: item.status || "active",
     });
+    setProductSearchInput("");
+    setIsProductDropdownOpen(false);
     setIsFormModalOpen(true);
   };
 
@@ -158,7 +193,7 @@ export default function FeaturedProductsPage() {
       await api.patch(`/featured-products/${id}/toggle-status`);
       toast.success("Display status updated!");
       fetchFeaturedProducts();
-    } catch (error) {
+    } catch {
       toast.error("Failed to toggle status!");
     }
   };
@@ -166,7 +201,7 @@ export default function FeaturedProductsPage() {
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.productId) {
-      toast.error("Please select a valid product!");
+      toast.error("Please select a product!");
       return;
     }
 
@@ -208,7 +243,7 @@ export default function FeaturedProductsPage() {
       setIsDeleteModalOpen(false);
       setSelectedFeatured(null);
       fetchFeaturedProducts();
-    } catch (error) {
+    } catch {
       toast.error("Failed to remove product!", { id: toastId });
     }
   };
@@ -256,7 +291,7 @@ export default function FeaturedProductsPage() {
         </div>
       </div>
 
-      {/* SEARCH & FILTER */}
+      {/* SEARCH & FILTER TRÊN BẢNG */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
         <Input
           icon={Search}
@@ -367,10 +402,9 @@ export default function FeaturedProductsPage() {
                     </td>
 
                     <td className="py-4 px-4 font-bold text-orange-600">
-                      {product.price?.toLocaleString()} VND
+                      {product.price?.toLocaleString()} $
                     </td>
 
-                    {/* SỬ DỤNG BADGE COMPONENT CỦA BẠN */}
                     <td className="py-4 px-4">
                       <Badge
                         variant={getBadgeVariant(item.badgeLabel)}
@@ -447,7 +481,10 @@ export default function FeaturedProductsPage() {
       {/* FORM MODAL */}
       <Modal
         isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
+        onClose={() => {
+          setIsFormModalOpen(false);
+          setIsProductDropdownOpen(false);
+        }}
         title={
           selectedFeatured
             ? "EDIT FEATURED PROMOTION"
@@ -459,25 +496,110 @@ export default function FeaturedProductsPage() {
           onSubmit={handleSubmitForm}
           className="space-y-4 text-xs font-mono"
         >
-          <div className="space-y-1">
+          {/* DATABASE-WIDE SEARCH COMBOBOX */}
+          <div className="space-y-1 relative">
             <label className="text-xs font-bold text-brand-dark uppercase block">
-              SELECT PRODUCT FROM VAULT *
+              SEARCH & SELECT ANY PRODUCT FROM DATABASE *
             </label>
-            <select
-              disabled={!!selectedFeatured}
-              value={formData.productId}
-              onChange={(e) =>
-                setFormData({ ...formData, productId: e.target.value })
-              }
-              className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-bold uppercase focus:outline-hidden focus:border-orange-600 disabled:opacity-50"
-            >
-              <option value="">-- SELECT PRODUCT --</option>
-              {allProducts.map((p) => (
-                <option key={p._id} value={p._id}>
-                  {p.name} ({p.price?.toLocaleString()} VND)
-                </option>
-              ))}
-            </select>
+
+            <div className="relative">
+              <input
+                type="text"
+                disabled={!!selectedFeatured}
+                placeholder="TYPE PRODUCT NAME OR SKU TO SEARCH DATABASE..."
+                value={
+                  isProductDropdownOpen
+                    ? productSearchInput
+                    : selectedProductObj
+                      ? `${selectedProductObj.name} ($${selectedProductObj.price?.toLocaleString()})`
+                      : ""
+                }
+                onFocus={() => {
+                  if (!selectedFeatured) {
+                    setIsProductDropdownOpen(true);
+                  }
+                }}
+                onChange={(e) => {
+                  setProductSearchInput(e.target.value);
+                  if (!isProductDropdownOpen) setIsProductDropdownOpen(true);
+                }}
+                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 pr-8 text-xs font-bold uppercase focus:outline-none focus:border-orange-600 disabled:opacity-50"
+              />
+              {isSearchingProducts ? (
+                <Loader2
+                  size={16}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-orange-600 animate-spin pointer-events-none"
+                />
+              ) : (
+                <ChevronDown
+                  size={16}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-brand-dark/60 pointer-events-none"
+                />
+              )}
+            </div>
+
+            {/* Overlay đóng Dropdown khi click ra ngoài */}
+            {isProductDropdownOpen && (
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setIsProductDropdownOpen(false)}
+              />
+            )}
+
+            {/* List kết quả tìm kiếm trực tiếp từ Backend */}
+            {isProductDropdownOpen && !selectedFeatured && (
+              <div className="absolute z-20 top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border-2 border-brand-dark shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] divide-y divide-brand-dark/10">
+                {isSearchingProducts ? (
+                  <div className="p-3 text-center text-xs text-brand-dark/50 flex items-center justify-center gap-2">
+                    <Loader2
+                      size={14}
+                      className="animate-spin text-orange-600"
+                    />
+                    SEARCHING ALL PRODUCTS...
+                  </div>
+                ) : searchedProducts.length > 0 ? (
+                  searchedProducts.map((p) => {
+                    const isSelected = formData.productId === p._id;
+                    return (
+                      <button
+                        key={p._id}
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, productId: p._id });
+                          setSelectedProductObj(p);
+                          setIsProductDropdownOpen(false);
+                        }}
+                        className={`w-full text-left p-2.5 text-xs font-bold uppercase hover:bg-orange-500 hover:text-white transition-colors flex items-center justify-between cursor-pointer ${
+                          isSelected
+                            ? "bg-brand-dark text-white"
+                            : "text-brand-dark"
+                        }`}
+                      >
+                        <div className="truncate pr-2">
+                          <div>{p.name}</div>
+                          {p.sku && (
+                            <div className="text-[10px] opacity-60">
+                              SKU: {p.sku}
+                            </div>
+                          )}
+                        </div>
+                        <div className="shrink-0 flex items-center gap-2">
+                          <span className="text-[11px] font-extrabold">
+                            ${p.price?.toLocaleString()}
+                          </span>
+                          {isSelected && <Check size={14} />}
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="p-3 text-center text-xs text-brand-dark/50">
+                    NO PRODUCTS FOUND MATCHING "
+                    {productSearchInput.toUpperCase()}"
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -494,7 +616,7 @@ export default function FeaturedProductsPage() {
                       .value as FeaturedProductItem["badgeLabel"],
                   })
                 }
-                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-bold uppercase focus:outline-hidden focus:border-orange-600"
+                className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-bold uppercase focus:outline-none focus:border-orange-600"
               >
                 <option value="HOT">🔥 HOT</option>
                 <option value="NEW">⚡ NEW</option>
@@ -525,7 +647,7 @@ export default function FeaturedProductsPage() {
                   status: e.target.value as FeaturedProductItem["status"],
                 })
               }
-              className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-bold uppercase focus:outline-hidden focus:border-orange-600"
+              className="w-full bg-brand-ivory/20 border-2 border-brand-dark p-2 text-xs font-bold uppercase focus:outline-none focus:border-orange-600"
             >
               <option value="active">ACTIVE (VISIBLE)</option>
               <option value="inactive">INACTIVE (HIDDEN)</option>
@@ -537,7 +659,10 @@ export default function FeaturedProductsPage() {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setIsFormModalOpen(false)}
+              onClick={() => {
+                setIsFormModalOpen(false);
+                setIsProductDropdownOpen(false);
+              }}
             >
               CANCEL
             </Button>

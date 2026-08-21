@@ -225,7 +225,7 @@ export default function OrdersPage() {
       }));
       setOrders(formattedOrders);
     } catch (err: any) {
-      console.error("Lỗi lấy danh sách đơn hàng:", err);
+      console.error("Error fetching order list:", err);
       const errMsg =
         err.response?.data?.message || "Failed to load mission orders scroll!";
       setError(errMsg);
@@ -284,7 +284,7 @@ export default function OrdersPage() {
       setCancelReason("Want to change shipping address");
       setCustomCancelReason("");
     } catch (err: any) {
-      console.error("Lỗi gửi yêu cầu hủy đơn:", err);
+      console.error("Error sending order cancellation request:", err);
       toast.error(
         err.response?.data?.message || "Failed to submit cancellation request.",
       );
@@ -379,7 +379,7 @@ export default function OrdersPage() {
 
       setIsReviewModalOpen(false);
     } catch (err: any) {
-      console.error("Lỗi gửi đánh giá:", err);
+      console.error("Error submitting review:", err);
       toast.error(
         err.response?.data?.message || "Failed to submit review. Try again!",
       );

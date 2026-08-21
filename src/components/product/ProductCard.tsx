@@ -25,6 +25,8 @@ export interface ProductProps {
   category?: string;
   inStock?: boolean;
   stock?: number;
+  autoRemoveFromWishlist?: boolean;
+  onAddToCartSuccess?: () => void;
 }
 
 export default function ProductCard({
@@ -39,12 +41,13 @@ export default function ProductCard({
   category,
   inStock = true,
   stock,
+  autoRemoveFromWishlist = false,
+  onAddToCartSuccess,
 }: ProductProps) {
   const router = useRouter();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
 
-  // 🟢 Lấy user từ Auth Store và xác định trạng thái đăng nhập
   const user = useAuthStore((state) => state.user);
   const isLoggedIn = Boolean(user);
 
@@ -146,9 +149,22 @@ export default function ProductCard({
     try {
       setIsAdding(true);
       await addToCart(id, 1);
+
+      if (isWished || autoRemoveFromWishlist) {
+        try {
+          await removeFromWishlist(id);
+        } catch (wishErr) {
+          console.error("Failed to remove from wishlist:", wishErr);
+        }
+        onAddToCartSuccess?.();
+      }
+
+      toast.dismiss();
+      toast.success(`ADDED "${name.toUpperCase()}" TO CART!`);
       setIsCartModalOpen(true);
     } catch (error: any) {
       console.error("Failed to add to cart:", error);
+      toast.dismiss();
       toast.error("FAILED TO ADD ITEM TO CART");
     } finally {
       setIsAdding(false);

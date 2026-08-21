@@ -80,16 +80,12 @@ function AdminLoginForm() {
 
         try {
           await api.post("/auth/logout");
-        } catch {
-          // Bỏ qua lỗi logout
-        }
+        } catch {}
         return;
       }
 
-      // Lưu User vào Store
       setAuth(user);
 
-      // Chuyển hướng cứng để nạp toàn bộ Session từ HttpOnly Cookie mới
       window.location.href = callbackUrl;
     } catch (error: any) {
       console.error("Login error detail:", error);

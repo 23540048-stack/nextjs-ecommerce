@@ -67,7 +67,6 @@ export default function ProductDetail({
   const { addToCart } = useCart();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
 
-  // 🟢 Lấy user từ Zustand Store và xác định trạng thái đăng nhập
   const user = useAuthStore((state) => state.user);
   const isLoggedIn = Boolean(user);
 

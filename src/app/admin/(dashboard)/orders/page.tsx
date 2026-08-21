@@ -122,7 +122,7 @@ export default function AdminOrdersPage() {
 
       if (!Array.isArray(rawData)) {
         throw new Error(
-          "Dữ liệu đơn hàng nhận được từ server không phải dạng danh sách.",
+          "Order data received from the server is not in list format.",
         );
       }
 
@@ -203,7 +203,7 @@ export default function AdminOrdersPage() {
       setError(
         err.response?.data?.message ||
           err.message ||
-          "Không thể tải danh sách đơn hàng!",
+          "Unable to load the order list!",
       );
     } finally {
       setIsLoading(false);

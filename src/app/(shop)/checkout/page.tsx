@@ -160,7 +160,6 @@ export default function CheckoutPage() {
 
           slug: product.slug || item.slug || "",
 
-          // Price already USD
           price,
 
           quantity: Number(item.quantity) || 1,

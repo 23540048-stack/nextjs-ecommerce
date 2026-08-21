@@ -28,7 +28,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
           <input
             ref={ref}
-            // 💡 GIẢI PHÁP: Nếu value bị undefined hoặc null, tự động đưa về ""
+            // GIẢI PHÁP: Nếu value bị undefined hoặc null, tự động đưa về ""
             value={value ?? ""}
             className={`w-full bg-brand-ivory text-brand-dark border border-brand-dark/20 py-2.5 ${
               Icon ? "pl-9" : "px-3"

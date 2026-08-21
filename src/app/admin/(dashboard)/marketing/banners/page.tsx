@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import toast, { Toaster } from "react-hot-toast"; // 🚀 Thêm React Hot Toast
+import toast, { Toaster } from "react-hot-toast";
 import {
   Image as ImageIcon,
   Plus,
@@ -388,7 +388,6 @@ export default function AdminBannersPage() {
 
   return (
     <div className="w-full min-h-screen bg-white text-brand-dark p-6 sm:p-8 font-mono space-y-8">
-      {/* 🚀 COMPONENT HIỂN THỊ TOAST NOTIFICATION */}
       <Toaster
         position="top-right"
         toastOptions={{

@@ -1,4 +1,3 @@
-// src/components/common/ConfirmModal.tsx
 "use client";
 
 import React from "react";
@@ -12,13 +11,13 @@ export interface ConfirmModalProps {
   onConfirm: () => void;
   title?: string;
   description?: string;
-  message?: string; // Alias tương thích
+  message?: string;
   confirmLabel?: string;
-  confirmText?: string; // Alias tương thích
+  confirmText?: string;
   cancelLabel?: string;
-  cancelText?: string; // Alias tương thích
+  cancelText?: string;
   isDangerous?: boolean;
-  variant?: "danger" | "warning" | "info"; // Alias tương thích
+  variant?: "danger" | "warning" | "info";
   isLoading?: boolean;
 }
 
@@ -37,7 +36,6 @@ export default function ConfirmModal({
   variant,
   isLoading = false,
 }: ConfirmModalProps) {
-  // Tự động đồng bộ các giá trị Alias
   const contentText = description || message || "";
   const finalConfirmLabel = confirmLabel || confirmText || "CONFIRM";
   const finalCancelLabel = cancelLabel || cancelText || "CANCEL";

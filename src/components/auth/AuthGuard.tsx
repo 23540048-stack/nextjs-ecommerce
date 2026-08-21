@@ -19,7 +19,6 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    // Với HttpOnly Cookie: Chỉ cần kiểm tra xem store có thông tin `user` hay chưa
     if (!user) {
       toast.error("PLEASE LOG IN TO ACCESS THIS PAGE!");
       router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);

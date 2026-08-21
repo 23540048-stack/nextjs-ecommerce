@@ -122,7 +122,6 @@ export default function AdminSideBar({ isOpen, onClose }: AdminSideBarProps) {
     setOpenSubmenu((prev) => (prev === name ? null : name));
   };
 
-  // 🟢 HÀM XỬ LÝ LOGOUT CHUẨN
   const handleConfirmLogout = async () => {
     setIsLoggingOut(true);
 

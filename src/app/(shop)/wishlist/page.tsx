@@ -125,7 +125,19 @@ export default function WishlistPage() {
   };
 
   const handleMoveAllToCart = async () => {
-    const availableItems = wishlist.filter((item) => item.inStock);
+    const availableItems = wishlist.filter((item) => {
+      const gearCountVal =
+        typeof item.gearCount === "number"
+          ? item.gearCount
+          : typeof item.stock === "number"
+            ? item.stock
+            : undefined;
+
+      return typeof gearCountVal === "number"
+        ? gearCountVal > 0
+        : item.inStock !== false;
+    });
+
     if (availableItems.length === 0) {
       toast.dismiss();
       toast.error("NO IN-STOCK ITEMS AVAILABLE TO ADD.");
@@ -275,6 +287,8 @@ export default function WishlistPage() {
                       subCategory={item.category || "SHINOBI GEAR"}
                       stock={gearCountVal}
                       inStock={isItemInStock}
+                      autoRemoveFromWishlist={true}
+                      onAddToCartSuccess={() => removeItemFromState(item._id)}
                     />
                     <button
                       onClick={() =>
